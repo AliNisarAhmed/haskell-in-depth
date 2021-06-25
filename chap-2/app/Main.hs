@@ -1,9 +1,21 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Main where
 
+import Fmt (Buildable(..), fmtLn, (+||), (||+), fmt, nameF, unwordsF)
+import Data.Text (Text)
+import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
+import System.Environment (getArgs)
+
 main :: IO ()
-main = putStrLn "Hello, Haskell!"
+main = do
+  args <- getArgs
+  case args of
+    ["-r", fname, dir] -> rotateFromFile (read dir) fname
+    ["-o", fname] -> orientFromFile fname
+    _ -> putStrLn $ "Usage: locator -o filename\n" ++ "locator -r filenam direction"
 
 class (Eq a, Enum a, Bounded a) => CyclicEnum a where
   cpred :: a -> a
@@ -17,10 +29,10 @@ class (Eq a, Enum a, Bounded a) => CyclicEnum a where
     | otherwise = succ d
 
 data Direction = North | East | South | West
-  deriving (Eq, Enum, Bounded, Show, CyclicEnum)
+  deriving (Eq, Enum, Bounded, Show, CyclicEnum, Read)
 
 data Turn = TNone | TLeft | TRight | TAround
-  deriving (Eq, Enum, Bounded, Show)
+  deriving (Eq, Enum, Bounded, Show, Read)
 
 instance Semigroup Turn where
   TNone <> t = t
@@ -34,6 +46,18 @@ instance Semigroup Turn where
 
 instance Monoid Turn where
   mempty = TNone
+
+instance Buildable Direction where
+  build North = "N"
+  build East = "E"
+  build South = "S"
+  build West = "W"
+
+instance Buildable Turn where
+  build TNone = "--"
+  build TLeft = "<-"
+  build TRight = "->"
+  build TAround = "||"
 
 rotate :: Turn -> Direction -> Direction
 rotate TNone = id
@@ -61,7 +85,13 @@ orientMany ds@(_ : _) = zipWith orient ds (tail ds)
 orientMany _ = []
 
 rotateFromFile :: Direction -> FilePath -> IO ()
-rotateFromFile = undefined
+rotateFromFile dir fname = do
+  f <- readFile fname
+  let turns = map read $ lines f
+      finalDir = rotateMany dir turns
+      dirs = rotateManySteps dir turns
+  fmtLn $ "Final direction: "+||finalDir||+""
+  fmt $ nameF "Intermediate directions" (unwordsF dirs)
 
 orientFromFile :: FilePath -> IO ()
 orientFromFile = undefined
