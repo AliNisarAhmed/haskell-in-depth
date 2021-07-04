@@ -1,13 +1,17 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module Main where
 
-import Fmt (Buildable(..), fmtLn, (+||), (||+), fmt, nameF, unwordsF)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
+import Fmt (Buildable (..), fmt, fmtLn, nameF, unwordsF, (+||), (||+))
 import System.Environment (getArgs)
+import System.Random.Stateful
+import TextShow
+import Control.Monad.Writer
 
 main :: IO ()
 main = do
@@ -59,6 +63,18 @@ instance Buildable Turn where
   build TRight = "->"
   build TAround = "||"
 
+deriving instance Ord Turn
+
+instance Uniform Direction where
+  uniformM rng = uniformRM (minBound, maxBound) rng
+
+instance UniformRange Direction where
+  uniformRM (lo, hi) rng = do
+    res <- uniformRM (fromEnum lo :: Int, fromEnum hi) rng
+    pure $ toEnum res
+
+----
+
 rotate :: Turn -> Direction -> Direction
 rotate TNone = id
 rotate TLeft = cpred
@@ -90,8 +106,48 @@ rotateFromFile dir fname = do
   let turns = map read $ lines f
       finalDir = rotateMany dir turns
       dirs = rotateManySteps dir turns
-  fmtLn $ "Final direction: "+||finalDir||+""
+  fmtLn $ "Final direction: " +|| finalDir ||+ ""
   fmt $ nameF "Intermediate directions" (unwordsF dirs)
 
 orientFromFile :: FilePath -> IO ()
 orientFromFile = undefined
+
+-- circleArea :: (Real a, Floating b) => a -> b
+-- circleArea r = pi * r * r
+
+----
+
+data Person = Person String (Maybe Int)
+
+instance TextShow Person where
+  showb (Person name Nothing) = fromString name
+  showb (Person name (Just age)) = fromString name <> " (" <> showb age <> ")"
+
+data Expr a
+  = Lit a
+  | Add (Expr a) (Expr a)
+  | Mult (Expr a) (Expr a)
+
+expr1 = Mult (Add (Lit 2) (Mult (Lit 3) (Lit 3))) (Lit 5)
+
+instance TextShow a => TextShow (Expr a) where
+  showbPrec p e =
+    case e of
+      Lit a -> showb a
+      Add e1 e2 -> showbHelper p 5 "+" e1 e2
+      Mult e1 e2 -> showbHelper p 6 "*" e1 e2
+    where
+      showbHelper outerPrec thisPrec op e1 e2 =
+        showbParen (outerPrec > thisPrec) $ showbPrec thisPrec e1 <> op <> showbPrec thisPrec e2
+
+
+sumN :: Int -> Writer String Int
+sumN 0 = writer (0, "finish")
+sumN n = do
+  tell (show n ++ ",")
+  s <- sumN (n - 1)
+  pure $ n + s
+
+addNumber :: Int -> IO String
+addNumber n = pure (++) <*> pure (show n ++ " ") <*> getLine
+
