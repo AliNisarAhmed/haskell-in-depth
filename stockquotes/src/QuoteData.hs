@@ -1,5 +1,5 @@
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module QuoteData where
 
@@ -10,6 +10,21 @@ import GHC.Generics (Generic)
 
 instance FromField Day where
   parseField = parseTimeM True defaultTimeLocale "%Y-%m-%d" . unpack
+
+data QField
+  = Open
+  | Closed
+  | High
+  | Low
+  | Volume
+  deriving (Eq, Ord, Show, Enum, Bounded)
+
+field2fun :: QField -> QuoteData -> Double
+field2fun Open = open
+field2fun Closed = close
+field2fun High = high
+field2fun Low = low
+field2fun Volume = fromIntegral . volume
 
 data QuoteData = QuoteData
   { day :: Day,
